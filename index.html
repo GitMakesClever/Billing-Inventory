@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <title>Billing Inventory</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="navbar-left">
+            <!-- <img src="grocery-icon.png" alt="Grocery Icon" class="icon"> -->
+        </div>
+        <div class="navbar-center">
+            <h1>Grocery Shopping</h1>
+        </div>
+        <div class="navbar-right">
+            <!-- <a href="http://localhost/billingreal/sample.html"><i class="fa fa-credit-card"></i> STOCK</a>
+            <a href="#stock"><i class="fa fa-archive"></i> CRUD</a>
+            <a href="#crud"><i class="fa fa-cogs"></i> ANALYTICS</a>
+            <a href="#filter"><i class="fa fa-filter"></i> SECURITY</a> -->
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="left-container">
+            <h2>Add Items
+                <i class="fas fa-times close-icon" onclick="clearInputs()"></i>
+            </h2>
+            <div class="form-container">
+                <form id="itemForm">
+                    <label for="itemName">Item Name:</label>
+                    <input type="text" id="itemName" required><br>
+                    <label for="quantity">Item Quantity:</label>
+                    <input type="number" id="quantity" required><br>
+
+                    <label for="price">Net Price:</label>
+                    <input type="number" id="price" required><br>
+                </form>
+                <button type="button" class="add-button" id="addItemButton" onclick="addItem()">Add Item (0)</button>
+            </div>
+        </div>
+
+        <div class="right-container">
+            <h2>
+                Item List
+                <i class="fas fa-redo-alt refresh-icon" onclick="clearAll()"></i>
+            </h2>
+            <div class="scrollable-table-wrapper">
+                <table id="itemTable">
+                    <thead>
+                        <tr>
+                            <th>Item No</th>
+                            <th>Item Name</th>
+                            <th>Quantity</th>
+                            <th>Price</th>
+                            <th>Total</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Table rows will be inserted here by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+            <button class="total-button" onclick="saveItemsToDatabase(); printReceipt()">Total: Rs.<span id="totalSum">0.00</span></button>
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+
+
+    <script>
+        let totalSum = 0;
+        let itemCount = 0;
+
+        document.getElementById('itemName').focus();
+
+        document.getElementById('itemForm').addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                const currentInput = document.activeElement;
+                if (currentInput.id === 'itemName') {
+                    document.getElementById('quantity').focus();
+                } else if (currentInput.id === 'quantity') {
+                    document.getElementById('price').focus();
+                } else if (currentInput.id === 'price') {
+                    addItem();
+                    document.getElementById('itemName').focus();
+                }
+            } else if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                focusNextInput('down');
+            } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                focusNextInput('up');
+            }
+        });
+
+        function clearInputs() {
+            document.getElementById('itemName').value = '';
+            document.getElementById('quantity').value = '';
+            document.getElementById('price').value = '';
+            document.getElementById('itemName').focus();
+        }
+
+        function focusNextInput(direction) {
+            const inputs = document.querySelectorAll('#itemForm input');
+            let index = Array.from(inputs).indexOf(document.activeElement);
+            if (direction === 'down') {
+                index = (index + 1) % inputs.length;
+            } else if (direction === 'up') {
+                index = (index - 1 + inputs.length) % inputs.length;
+            }
+            inputs[index].focus();
+        }
+
+        function updateAddItemButton() {
+            document.getElementById('addItemButton').textContent = `Add Item (${itemCount})`;
+        }
+
+        function showNotification(message, duration = 1000) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.classList.add('show');
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, duration);
+        }
+
+        function addItem() {
+            const itemName = document.getElementById('itemName').value;
+            const quantity = parseFloat(document.getElementById('quantity').value);
+            const price = parseFloat(document.getElementById('price').value);
+
+            if (itemName === '' || isNaN(quantity) || isNaN(price)) {
+                alert('Please fill out all fields correctly');
+                return;
+            }
+
+            itemCount++;
+            const total = quantity * price;
+            const table = document.getElementById('itemTable').getElementsByTagName('tbody')[0];
+            const newRow = table.insertRow();
+
+            const itemNoCell = newRow.insertCell(0);
+            const nameCell = newRow.insertCell(1);
+            const quantityCell = newRow.insertCell(2);
+            const priceCell = newRow.insertCell(3);
+            const totalCell = newRow.insertCell(4);
+            const actionCell = newRow.insertCell(5);
+
+            itemNoCell.textContent = itemCount;
+            nameCell.textContent = itemName;
+            quantityCell.textContent = quantity;
+            priceCell.textContent = `Rs.${price.toFixed(2)}`;
+            totalCell.textContent = `Rs.${total.toFixed(2)}`;
+
+            const editIcon = document.createElement('span');
+            editIcon.textContent = '✏️';
+            editIcon.classList.add('icons');
+            editIcon.onclick = function () {
+                editItem(newRow, itemName, quantity, price);
+            };
+
+            const deleteIcon = document.createElement('span');
+            deleteIcon.textContent = '🗑️';
+            deleteIcon.classList.add('icons');
+            deleteIcon.onclick = function () {
+                confirmDeleteItem(newRow, total);
+            };
+
+            actionCell.appendChild(editIcon);
+            actionCell.appendChild(deleteIcon);
+
+            totalSum += total;
+            document.getElementById('totalSum').textContent = totalSum.toFixed(2);
+
+            document.getElementById('itemForm').reset();
+            document.getElementById('itemName').focus();
+
+            updateAddItemButton();
+            showNotification('Added Successfully', 2000);
+        }
+
+        function editItem(row, itemName, quantity, price) {
+            document.getElementById('itemName').value = itemName;
+            document.getElementById('quantity').value = quantity;
+            document.getElementById('price').value = price;
+
+            deleteItem(row, quantity * price);
+        }
+
+        function confirmDeleteItem(row, total) {
+            const confirmation = confirm("Are you sure you want to delete this item?");
+            if (confirmation) {
+                deleteItem(row, total);
+            }
+        }
+
+        function deleteItem(row, total) {
+            totalSum -= total;
+            document.getElementById('totalSum').textContent = totalSum.toFixed(2);
+            row.remove();
+            itemCount--;
+            updateItemNumbers();
+            updateAddItemButton();
+            showNotification('Deleted Successfully', 2000);
+        }
+
+        function updateItemNumbers() {
+            const table = document.getElementById('itemTable').getElementsByTagName('tbody')[0];
+            for (let i = 0; i < table.rows.length; i++) {
+                table.rows[i].cells[0].textContent = i + 1;
+            }
+        }
+
+        function clearAll() {
+            const table = document.getElementById('itemTable').getElementsByTagName('tbody')[0];
+            table.innerHTML = '';
+            totalSum = 0;
+            document.getElementById('totalSum').textContent = totalSum.toFixed(2);
+            itemCount = 0;
+            updateAddItemButton();
+        }
+
+        function printReceipt() {
+    const itemTable = document.getElementById('itemTable'); // Assuming the table id is 'itemTable'
+    const totalSum = document.getElementById('totalSum').innerText; // Assuming totalSum id is 'totalSum'
+    const receiptWindow = window.open('', '_blank');
+
+    // Get current date and time
+    const currentDate = new Date();
+    const formattedDate = currentDate.toLocaleDateString();
+    const formattedTime = currentDate.toLocaleTimeString();
+
+    // Define the receipt content with the address, phone number, and date/time
+    const receiptContent = `
+        <html>
+        <head>
+            <title>Receipt</title>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    padding: 20px;
+                    width: 300px;
+                }
+                h2 {
+                    text-align: center;
+                    margin-bottom: 20px;
+                }
+                .header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 20px;
+                }
+                .address, .date-time {
+                    font-size: 14px;
+                }
+                .address {
+                    text-align: left;
+                }
+                .date-time {
+                    text-align: right;
+                }
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-bottom: 20px;
+                }
+                th, td {
+                    padding: 8px;
+                    text-align: left;
+                    border-bottom: 1px solid #ddd;
+                }
+                .total {
+                    font-weight: bold;
+                    text-align: right;
+                }
+            </style>
+        </head>
+        <body>
+            <h2>ST.ANTONY'S Grocery</h2>
+            <div class="header">
+                <div class="address">
+                    38/B Swamimalai Main Road,<br>
+                    Dindigul-612002<br>
+                    Phone: +91-123-456-7890
+                </div>
+                <div class="date-time">
+                    Date: ${formattedDate}<br>
+                    Time: ${formattedTime}
+                </div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Item Name</th>
+                        <th>Quantity</th>
+                        <th>Price</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${Array.from(itemTable.rows).slice(1).map(row => `
+                        <tr>
+                            <td>${row.cells[1].innerText}</td>
+                            <td>${row.cells[2].innerText}</td>
+                            <td>${row.cells[3].innerText}</td>
+                            <td>${row.cells[4].innerText}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            <div class="total">Total: Rs. ${totalSum}</div>
+        </body>
+        </html>
+    `;
+
+    // Write the receipt content to the new window
+    receiptWindow.document.write(receiptContent);
+    receiptWindow.document.close();
+
+    // Automatically print the receipt
+    receiptWindow.print();
+    receiptWindow.onafterprint = function() {
+        receiptWindow.close();
+    };
+}
+
+function saveItemsToDatabase() {
+    const table = document.getElementById('itemTable').getElementsByTagName('tbody')[0];
+    const items = [];
+    
+    for (let i = 0; i < table.rows.length; i++) {
+        const row = table.rows[i];
+        const itemName = row.cells[1].innerText;
+        const quantity = parseFloat(row.cells[2].innerText);
+        const price = parseFloat(row.cells[3].innerText.replace('Rs.', ''));
+        const total = parseFloat(row.cells[4].innerText.replace('Rs.', ''));
+        
+        items.push({ itemName, quantity, price, total });
+    }
+    
+    fetch('save_to_db.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            printReceipt(); // Call print receipt after saving
+        } else {
+            alert(data.message);
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    let barcodeBuffer = '';
+    let barcodeTimeout;
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key.length === 1) { // Check if key is a character
+            barcodeBuffer += event.key;
+
+            // Clear the previous timeout
+            clearTimeout(barcodeTimeout);
+
+            // Set a new timeout to process the barcode
+            barcodeTimeout = setTimeout(() => {
+                if (barcodeBuffer) {
+                    // Process the barcode
+                    fetchItemDetails(barcodeBuffer);
+                    barcodeBuffer = ''; // Clear buffer
+                }
+            }, 100); // Adjust this timeout to match your barcode scanner speed
+        }
+    });
+
+    function fetchItemDetails(barcode) {
+        fetch('get_item_details.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+                item_id: barcode
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('itemName').value = data.item_name;
+                document.getElementById('quantity').value = data.item_quantity;
+                document.getElementById('price').value = data.net_price;
+            } else {
+                alert('Item not found.');
+            }
+        })
+        .catch(error => console.error('Error fetching item details:', error));
+    }
+});
+
+
+    </script>
+    <!--CREATE TABLE `items` (
+        `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        `item_name` VARCHAR(255) NOT NULL,
+        `quantity` INT NOT NULL,
+        `price` DECIMAL(10, 2) NOT NULL,
+        `total` DECIMAL(10, 2) NOT NULL
+      );-->
+      
+</body>
+</html>
